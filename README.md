@@ -1,6 +1,7 @@
 # SimplyAnnotate - Text Annotation Tool
 
 This project is a simple Flask-based web application for annotating text, specifically for Named Entity Recognition (NER) tasks. It allows you to load text, select portions for annotation, manage labels, and export annotations in various formats like CSV, JSON, TXT, and CoNLL-U.
+![App Layout](screenshot.png)
 
 ## Features
 
