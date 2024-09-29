@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SimplyAnnotate - Simple Text Annotation Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f4f8;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .instructions {
+            font-size: 0.9em;
+            color: #555;
+        }
+        #inputText {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        #annotatedText {
+            width: 100%;
+            min-height: 200px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            cursor: text;
+            position: relative;
+            box-sizing: border-box;
+        }
+        .highlight {
+            background-color: yellow;
+            cursor: pointer;
+        }
+        #labelDropdown {
+            position: absolute;
+            display: none;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            z-index: 1000;
+            padding: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        #labelDropdown button {
+            display: block;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        #messageBox {
+            margin-top: 10px;
+        }
+        #annotationTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        #annotationTable th, #annotationTable td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        .label-management {
+            margin-bottom: 20px;
+        }
+        .label-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .label-item .color-box {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border: 1px solid #000;
+        }
+        .label-item button {
+            margin-left: auto;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 20px;
+            width: 50%;
+            position: relative;
+            border-radius: 4px;
+        }
+        .modal-content .close {
+            position: absolute;
+            right: 15px;
+            top: 10px;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        .modal-content h2 {
+            margin-top: 0;
+        }
+        .btn {
+            padding: 6px 12px;
+            margin: 5px 0;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        .btn-primary {
+            background-color: #007BFF;
+            color: #fff;
+        }
+        .btn-secondary {
+            background-color: #6C757D;
+            color: #fff;
+        }
+        .btn-danger {
+            background-color: #DC3545;
+            color: #fff;
+        }
+        .alert {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        .alert-success {
+            background-color: #D4EDDA;
+            color: #155724;
+        }
+        .alert-error {
+            background-color: #F8D7DA;
+            color: #721C24;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>SimplyAnnotate - Simple Text Annotation Tool</h1>
+
+    <!-- Instructions -->
+    <p class="instructions">
+        <strong>Instructions:</strong><br>
+        1. Enter or paste the text you wish to annotate below.<br>
+        2. Click "Load Text" to begin annotating.<br>
+        3. Select text in the "Annotated Text" area to label entities.<br>
+        4. The label dropdown will automatically appear; choose a label to annotate.<br>
+        5. To remove an annotation, select annotated text and click "Remove Annotation".<br>
+        6. Manage labels or export annotations as needed.
+    </p>
+
+    <!-- Message Box -->
+    <div id="messageBox"></div>
+
+    <!-- Text Input Area -->
+    <div>
+        <label for="inputText"><strong>Enter Text to Annotate:</strong></label><br>
+        <textarea id="inputText" placeholder="Enter or paste text here..."></textarea><br>
+        <button class="btn btn-primary" onclick="loadInputText()">Load Text</button>
+    </div>
+
+    <!-- Annotated Text Area -->
+    <div>
+        <label for="annotatedText"><strong>Annotated Text:</strong></label><br>
+        <div id="annotatedText" onmouseup="handleTextSelection(event)"></div>
+        <div id="labelDropdown"></div>
+    </div>
+
+    <!-- Buttons Row -->
+    <div>
+        <button class="btn btn-secondary" onclick="resetAnnotatedText()">Reset Text & Annotations</button>
+        <button class="btn btn-secondary" onclick="showLabelModal()">Manage Labels</button>
+        <button class="btn btn-primary" onclick="exportAnnotations()">Export Annotations</button>
+    </div>
+
+    <!-- Export Options -->
+    <div>
+        <label for="exportFormat"><strong>Export Format:</strong></label>
+        <select id="exportFormat">
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+            <option value="txt">TXT</option>
+            <option value="conllu">CoNLL-U</option>
+        </select>
+    </div>
+
+    <!-- Annotations Table -->
+    <div>
+        <h2>Annotations</h2>
+        <table id="annotationTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Entity</th>
+                    <th>Label</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Label Management Modal -->
+    <div id="labelModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeLabelModal()">&times;</span>
+            <h2>Manage Labels</h2>
+            <div id="labelList"></div>
+            <h3>Add/Edit Label</h3>
+            <form id="labelForm" onsubmit="saveLabel(event)">
+                <input type="hidden" id="labelIndex">
+                <label for="labelName">Label Name:</label><br>
+                <input type="text" id="labelName" required><br>
+                <label for="labelColor">Label Color:</label><br>
+                <input type="color" id="labelColor" required><br><br>
+                <button class="btn btn-primary" type="submit">Save Label</button>
+                <button class="btn btn-secondary" type="button" onclick="closeLabelModal()">Cancel</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    let annotations = [];
+    let labels = [];
+    let selectedRange = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadLabels();
+    });
+
+    function showMessage(type, text) {
+        const messageBox = document.getElementById('messageBox');
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+        messageBox.innerHTML = `<div class="alert ${alertClass}">${text}</div>`;
+        setTimeout(() => { messageBox.innerHTML = ''; }, 5000);
+    }
+
+    async function loadInputText() {
+        const inputText = document.getElementById('inputText').value.trim();
+        if (inputText === '') {
+            showMessage('error', 'Please enter some text to annotate.');
+            return;
+        }
+        try {
+            const response = await fetch('/set_text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text_data: inputText })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                document.getElementById('annotatedText').textContent = inputText;
+                annotations = [];
+                updateAnnotationList();
+                showMessage('success', 'Text loaded successfully!');
+            } else {
+                showMessage('error', data.message || 'Error loading text.');
+            }
+        } catch (error) {
+            console.error('Error loading text:', error);
+            showMessage('error', 'Error loading text.');
+        }
+    }
+
+    function handleTextSelection(event) {
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+
+        if (selectedText.length > 0) {
+            selectedRange = selection.getRangeAt(0);
+            const labelDropdown = document.getElementById('labelDropdown');
+
+            const offsets = getSelectionOffsets();
+            const isAnnotated = annotations.some(a => a.start === offsets.start && a.end === offsets.end);
+
+            labelDropdown.innerHTML = '';
+            labelDropdown.style.display = 'block';
+            labelDropdown.style.top = `${event.clientY + window.scrollY + 10}px`;
+            labelDropdown.style.left = `${event.clientX + window.scrollX}px`;
+
+            if (isAnnotated) {
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove Annotation';
+                removeButton.className = 'btn btn-danger';
+                removeButton.onclick = removeAnnotation;
+                labelDropdown.appendChild(removeButton);
+            } else {
+                labels.forEach(label => {
+                    const button = document.createElement('button');
+                    button.textContent = label.label;
+                    button.style.backgroundColor = label.color;
+                    button.className = 'btn';
+                    button.onclick = () => applyLabel(label.label);
+                    labelDropdown.appendChild(button);
+                });
+            }
+        } else {
+            hideLabelDropdown();
+        }
+    }
+
+    function hideLabelDropdown() {
+        const labelDropdown = document.getElementById('labelDropdown');
+        labelDropdown.style.display = 'none';
+        selectedRange = null;
+    }
+
+    function getSelectionOffsets() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return null;
+
+        const range = selection.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(document.getElementById('annotatedText'));
+        preCaretRange.setEnd(range.startContainer, range.startOffset);
+        const start = preCaretRange.toString().length;
+        const end = start + range.toString().length;
+
+        return { start, end };
+    }
+
+    async function applyLabel(labelName) {
+        const offsets = getSelectionOffsets();
+        if (offsets && offsets.start >= 0 && offsets.end > offsets.start) {
+            const textContent = document.getElementById('annotatedText').textContent;
+            const annotation = {
+                text: textContent,
+                start: offsets.start,
+                end: offsets.end,
+                label: labelName
+            };
+            await saveAnnotation(annotation);
+            window.getSelection().removeAllRanges();
+            hideLabelDropdown();
+        } else {
+            showMessage('error', 'Invalid selection. Please select valid text to annotate.');
+        }
+    }
+
+    async function saveAnnotation(annotation) {
+        try {
+            const response = await fetch('/save_annotation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(annotation)
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                showMessage('success', 'Annotation saved successfully!');
+                await loadAnnotations();
+            } else {
+                showMessage('error', data.message || 'Error saving annotation.');
+            }
+        } catch (error) {
+            console.error('Error saving annotation:', error);
+            showMessage('error', 'Error saving annotation.');
+        }
+    }
+
+    async function loadAnnotations() {
+        try {
+            const response = await fetch('/get_annotations');
+            const data = await response.json();
+            annotations = data.annotations;
+            updateAnnotationList();
+            highlightAnnotations();
+        } catch (error) {
+            console.error('Error loading annotations:', error);
+        }
+    }
+
+    function updateAnnotationList() {
+        const annotationTableBody = document.querySelector('#annotationTable tbody');
+        annotationTableBody.innerHTML = '';
+        annotations.forEach((annotation, index) => {
+            const row = document.createElement('tr');
+            const text = annotation.text.substring(annotation.start, annotation.end);
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${text}</td>
+                <td>${annotation.label}</td>
+                <td><button class="btn btn-danger" onclick="deleteAnnotation(${index})">Delete</button></td>
+            `;
+            annotationTableBody.appendChild(row);
+        });
+    }
+
+    function highlightAnnotations() {
+        const annotatedText = document.getElementById('annotatedText');
+        const originalText = annotatedText.textContent;
+        annotatedText.innerHTML = '';
+
+        let lastIndex = 0;
+
+        annotations.sort((a, b) => a.start - b.start).forEach(annotation => {
+            const start = annotation.start;
+            const end = annotation.end;
+            const label = annotation.label;
+
+            annotatedText.appendChild(document.createTextNode(originalText.substring(lastIndex, start)));
+
+            const span = document.createElement('span');
+            span.className = 'highlight';
+            span.textContent = originalText.substring(start, end);
+            span.dataset.start = start;
+            span.dataset.end = end;
+            span.dataset.label = label;
+            span.style.backgroundColor = getColorForLabel(label);
+            annotatedText.appendChild(span);
+
+            lastIndex = end;
+        });
+
+        annotatedText.appendChild(document.createTextNode(originalText.substring(lastIndex)));
+    }
+
+    function getColorForLabel(labelName) {
+        const label = labels.find(l => l.label === labelName);
+        return label ? label.color : 'yellow';
+    }
+
+    async function deleteAnnotation(index) {
+        const annotation = annotations[index];
+        try {
+            const response = await fetch('/delete_annotation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(annotation)
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                showMessage('success', 'Annotation deleted successfully!');
+                await loadAnnotations();
+            } else {
+                showMessage('error', data.message || 'Error deleting annotation.');
+            }
+        } catch (error) {
+            console.error('Error deleting annotation:', error);
+            showMessage('error', 'Error deleting annotation.');
+        }
+    }
+
+    async function removeAnnotation() {
+        const offsets = getSelectionOffsets();
+        if (offsets && offsets.start >= 0 && offsets.end > offsets.start) {
+            const index = annotations.findIndex(a => a.start === offsets.start && a.end === offsets.end);
+            if (index !== -1) {
+                await deleteAnnotation(index);
+                window.getSelection().removeAllRanges();
+                hideLabelDropdown();
+            } else {
+                showMessage('error', 'No annotation found on the selected text.');
+            }
+        } else {
+            showMessage('error', 'Invalid selection. Please select annotated text to remove annotation.');
+        }
+    }
+
+    async function loadLabels() {
+        try {
+            const response = await fetch('/load_labels');
+            const data = await response.json();
+            labels = data.labels;
+        } catch (error) {
+            console.error('Error loading labels:', error);
+        }
+    }
+
+    function showLabelModal() {
+        document.getElementById('labelForm').reset();
+        document.getElementById('labelIndex').value = '';
+        updateLabelList();
+        document.getElementById('labelModal').style.display = 'block';
+    }
+
+    function closeLabelModal() {
+        document.getElementById('labelModal').style.display = 'none';
+    }
+
+    function updateLabelList() {
+        const labelList = document.getElementById('labelList');
+        labelList.innerHTML = '';
+        labels.forEach((label, index) => {
+            const div = document.createElement('div');
+            div.className = 'label-item';
+            div.innerHTML = `
+                <div class="color-box" style="background-color: ${label.color};"></div>
+                ${label.label}
+                <button class="btn btn-secondary" onclick="editLabel(${index})">Edit</button>
+                <button class="btn btn-danger" onclick="deleteLabel(${index})">Delete</button>
+            `;
+            labelList.appendChild(div);
+        });
+    }
+
+    async function saveLabel(event) {
+        event.preventDefault();
+        const labelName = document.getElementById('labelName').value.trim();
+        const labelColor = document.getElementById('labelColor').value;
+        const labelIndex = document.getElementById('labelIndex').value;
+
+        if (labelName === '') {
+            showMessage('error', 'Label name is required.');
+            return;
+        }
+
+        const labelData = { label: labelName, color: labelColor };
+
+        try {
+            if (labelIndex === '') {
+                const response = await fetch('/save_label', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(labelData)
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showMessage('success', 'Label added successfully!');
+                } else {
+                    showMessage('error', data.message || 'Error adding label.');
+                }
+            } else {
+                const response = await fetch('/update_label', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(labelData)
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showMessage('success', 'Label updated successfully!');
+                } else {
+                    showMessage('error', data.message || 'Error updating label.');
+                }
+            }
+            await loadLabels();
+            closeLabelModal();
+        } catch (error) {
+            console.error('Error saving label:', error);
+            showMessage('error', 'Error saving label.');
+        }
+    }
+
+    function editLabel(index) {
+        const label = labels[index];
+        document.getElementById('labelName').value = label.label;
+        document.getElementById('labelColor').value = label.color;
+        document.getElementById('labelIndex').value = index;
+        document.getElementById('labelModal').style.display = 'block';
+    }
+
+    async function deleteLabel(index) {
+        const label = labels[index];
+        try {
+            const response = await fetch('/delete_label', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ label: label.label })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                showMessage('success', 'Label deleted successfully!');
+                await loadLabels();
+            } else {
+                showMessage('error', data.message || 'Error deleting label.');
+            }
+        } catch (error) {
+            console.error('Error deleting label:', error);
+            showMessage('error', 'Error deleting label.');
+        }
+    }
+
+    async function resetAnnotatedText() {
+        if (!confirm('Are you sure you want to reset the text and annotations?')) {
+            return;
+        }
+        try {
+            const response = await fetch('/reset_annotations', { method: 'POST' });
+            const data = await response.json();
+            if (data.status === 'success') {
+                document.getElementById('annotatedText').textContent = '';
+                annotations = [];
+                updateAnnotationList();
+                showMessage('success', 'Text and annotations reset successfully!');
+            } else {
+                showMessage('error', data.message || 'Error resetting annotations.');
+            }
+        } catch (error) {
+            console.error('Error resetting annotations:', error);
+            showMessage('error', 'Error resetting annotations.');
+        }
+    }
+
+    async function exportAnnotations() {
+        const format = document.getElementById('exportFormat').value;
+        try {
+            const response = await fetch('/export_annotations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ format })
+            });
+            if (response.ok) {
+                const blob = await response.blob();
+                const timestamp = new Date().toISOString().replace(/[-T:\.Z]/g, '');
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `annotations_${timestamp}.${format}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                const data = await response.json();
+                showMessage('error', data.message || 'Error exporting annotations.');
+            }
+        } catch (error) {
+            console.error('Error exporting annotations:', error);
+            showMessage('error', 'Error exporting annotations.');
+        }
+    }
+
+    // Close the label dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const labelDropdown = document.getElementById('labelDropdown');
+        if (!labelDropdown.contains(event.target) && event.target.id !== 'annotatedText') {
+            hideLabelDropdown();
+        }
+    });
+
+    // Load initial annotations
+    loadAnnotations();
+
+</script>
+
+</body>
+</html>
